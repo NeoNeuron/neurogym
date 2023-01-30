@@ -21,11 +21,12 @@ class Dataset(object):
         max_batch: int, maximum number of batch for iterator, default infinite
         batch_first: bool, if True, return (batch, seq_len, n_units), default False
         cache_len: int, default length of caching
+        seed: int, seed for random number generator
     """
 
     def __init__(self, env, env_kwargs=None,
                  batch_size=1, seq_len=None, max_batch=np.inf,
-                 batch_first=False, cache_len=None):
+                 batch_first=False, cache_len=None, seed=None):
         if isinstance(env, gym.Env):
             self.envs = [copy.deepcopy(env) for _ in range(batch_size)]
         else:
@@ -34,9 +35,9 @@ class Dataset(object):
                 env_kwargs = {}
             self.envs = [gym.make(env, **env_kwargs)
                          for _ in range(batch_size)]
+        self.seed(seed)     # seed before reset
         for env in self.envs:
             env.reset()
-        self.seed()
 
         env = self.envs[0]
         self.env = env
@@ -135,6 +136,14 @@ class Dataset(object):
         # return inputs, np.expand_dims(target, axis=2)
 
     def seed(self, seed=None):
+        """set seed for all environments in the dataset.
+            only valid before first env.reset()
+
+        Args:
+            seed (int, optional): If not None, 
+                set seed = seed + i for i-th env.
+                Defaults to None.
+        """
         for i, env in enumerate(self.envs):
             if seed is None:
                 env.seed(seed)

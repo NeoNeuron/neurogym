@@ -104,3 +104,49 @@ def test_examples_different_custom_env():
 
     env = TestEnv()
     _test_examples_different(env)
+
+def test_seeding(env=None, seed=0):
+    """Test if environments are replicable."""
+    if env is None:
+        env = ngym.all_envs()[0]
+
+    if isinstance(env, str):
+        kwargs = {'dt': 20}
+        env = ngym.make(env, **kwargs)
+    else:
+        if not isinstance(env, gym.Env):
+            raise ValueError('env must be a string or a gym.Env')
+    env.seed(seed)
+    env.reset()
+    #Todo: fix replication for HierarchicalReasoning-v0
+    if not hasattr(env, 'gt') or env == 'HierarchicalReasoning-v0':
+        # skip environments without ground truth
+        return np.zeros(2), np.zeros(2)
+    batch_size = 16
+    # need to be long enough to make sure variability in inputs or target
+    seq_len = 1000
+    dataset = ngym.Dataset(
+        env, batch_size=batch_size, seq_len=seq_len, seed=seed)
+
+    inputs_mat = []
+    targets_mat = []
+    for _ in range(10):
+        inputs, targets = dataset()
+        inputs_mat.append(inputs)
+        targets_mat.append(targets)
+    inputs_mat = np.array(inputs_mat)
+    targets_mat = np.array(targets_mat)
+    return inputs_mat, targets_mat
+
+# Envs without psychopy # TODO: check if contrib or collections include psychopy
+ENVS_NOPSYCHOPY = ngym.all_envs(psychopy=False, contrib=True, collections=True)
+
+# TODO: there is one env for which it sometimes raises an error
+def test_seeding_all():
+    """Test if all environments are replicable."""
+    for env_name in sorted(ENVS_NOPSYCHOPY):
+        print('Running env: {:s}'.format(env_name))
+        inputs1, targets1 = test_seeding(env_name, seed=0)
+        inputs2, targets2 = test_seeding(env_name, seed=0)
+        assert (inputs1 == inputs2).all(), 'inputs are not identical'
+        assert (targets1 == targets2).all(), 'targets are are not identical'
